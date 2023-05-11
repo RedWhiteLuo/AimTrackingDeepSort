@@ -3,6 +3,10 @@ import torch
 import win32con
 import win32gui
 import win32ui
+from scipy.optimize import linear_sum_assignment
+
+import Kalman
+from Kalman import kalman
 from models.common import DetectMultiBackend
 from utils.general import (cv2, non_max_suppression, scale_boxes, xyxy2xywh)
 from utils.augmentations import letterbox
@@ -11,7 +15,7 @@ from utils.torch_utils import select_device
 from camera import GetCamera
 
 screen_w, screen_h = 1920, 1080  # 屏幕的分辨率
-grab_w, grab_h = 640, 640  # 获取框的长和宽
+grab_w, grab_h = 640, 480  # 获取框的长和宽
 centre_x, centre_y = screen_w / 2 + 640, screen_h / 2 + 160  # 准心中心
 
 hwin = win32gui.GetDesktopWindow()
@@ -95,6 +99,28 @@ def IMG_Tagging(im0, aims, color=False, text=False):
         aim[2] = int(color) if color else aim[2]
         Picture.box_label(aim[0], label, color=colors(int(aim[2]), True))  # 坐标 标签 颜色（类别）
     return Picture.result()
+
+class MultiDetection:
+    def __init__(self):
+        print("已使用目标跟踪器")
+        self.tracks = [] #对每个人物进行保存 [ [八坐标/六坐标]，cls，conf，id, kalman]
+    def match_detections(self, cost_matrix):
+        matches = linear_sum_assignment(cost_matrix)
+        tracks = self.tracks
+
+    def new_track(self, new_track):
+        new_track.append(kalman.Position_Predict(new_track[0][4:6]))
+        self.tracks.append(new_track)
+    def del_track(self, id):
+        index = self.tracks.index(id)
+        self.tracks = self.tracks[:id].append(self.tracks[id+1:]) #删除一个目标行
+    def draw_tracks(self):
+        tracks = self.tracks
+        for track in tracks:
+            continue
+
+
+
 
 
 class YOLO:

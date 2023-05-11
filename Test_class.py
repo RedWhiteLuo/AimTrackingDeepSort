@@ -21,11 +21,11 @@ def one(queue1, queue2):
     """
     while True:
         T1 = time.perf_counter()
-        resized_img, img = Get_img_source()  # 获取图片
+        resized_img, img = Get_img_source(other_source=0)  # 获取图片
         queue1.put(resized_img)
         queue2.put(img)
         T2 = time.perf_counter()
-        print(T2-T1)
+        # print(T2-T1)
 
 
 def two(queue1, queue3, queue4, ):
@@ -98,17 +98,17 @@ def show(queue5, queue6, ):
             d_position_list = np.vstack((d_position_list, d_position))  # 添加到移动速度列表中
             [mx, my] = d_position_list.mean(0)  # 用移动速度列计算出平均值
             if d_position_list.shape[0] == 15:  # 使列表只存储5帧的数据
-                dx, dy = int(mx * aver_frame_rate * 0.1), int(my * aver_frame_rate * 0.1)  # 通过延迟计算出补偿量
+                dx, dy = int(mx * aver_frame_rate * 0.1), int(my * aver_frame_rate * 0.05)  # 通过延迟计算出补偿量
                 if dx / d_position[0] < 0 and dy / d_position[1] < 0:   # 即：被检测的物体变向
                     d_position_list = np.array([[0, 0]])
                 else:
                     d_position_list = np.delete(d_position_list, 0, 0)
+                    aim_B = [[x1 + dx, y1 + dy, x2 + dx, y2 + dy], 1, 0]
+                    img = IMG_Tagging(img, list([aim_B]), color=2, text="B")  # 将B类预测的坐标在图片上标注出来
             else:
                 dx = dy = 0  # 没有目标就清空列表，为下次做准备
             aim_A = [[x1, y1, x2, y2], 1, 0]
-            aim_B = [[x1 + dx, y1 + dy, x2 + dx, y2 + dy], 1, 0]
             img = IMG_Tagging(img, list([aim_A]), color=5, text="A")  # 将A类预测的坐标在图片上标注出来
-            img = IMG_Tagging(img, list([aim_B]), color=2, text="B")  # 将B类预测的坐标在图片上标注出来
         else:
             d_position_list = np.array([[0, 0]])  # 清除B类预测的数据列表
             KM.clean()  # 无目标的时候清楚Kalman预测类的数据
