@@ -136,6 +136,19 @@ class YOLO:
         self.model = DetectMultiBackend(weights, device=device, dnn=dnn, data=datas, fp16=half)
         print("已激活网络")
 
+
+class YOLO:
+    def __init__(self, weights, datas, device='', dnn=False, half=False):
+        """
+        激活class YOLO 类中的网络
+        \n包含两个函数：
+        \n    前处理 PreProcess
+        \n    预测  Predict
+        """
+        device = select_device(device)
+        self.model = DetectMultiBackend(weights, device=device, dnn=dnn, data=datas, fp16=half)
+        print("已激活网络")
+
     def PreProcess(self, resized_img):
         """
         输入缩放为 640 * 640  [w,h,c] 格式的图片
