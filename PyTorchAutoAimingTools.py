@@ -129,8 +129,7 @@ class MultiDetection:
                     cost_matrix.append(distance)
                     # print(track_x, track_y, detect_x, detect_y, cost_matrix)
             cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))
-            print(cost_matrix)
-            # matches = linear_sum_assignment(cost_matrix)
+            person, job = linear_sum_assignment(cost_matrix)
 
 
 class YOLO:
