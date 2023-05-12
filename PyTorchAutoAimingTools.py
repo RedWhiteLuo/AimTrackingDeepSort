@@ -6,7 +6,6 @@ import win32ui
 from scipy.optimize import linear_sum_assignment
 
 import Kalman
-from Kalman import kalman
 from models.common import DetectMultiBackend
 from utils.general import (cv2, non_max_suppression, scale_boxes, xyxy2xywh)
 from utils.augmentations import letterbox
@@ -121,12 +120,11 @@ class MultiDetection:
             # 卡尔曼更新
             # print(self.tracks)
             for track in self.tracks:
-                print(track)
-                [track_x, track_y] = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
-                print(track_x, track_y)
+                # print(track)
+                track[3][:2] = track_x, track_y = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
                 for detect in detections:
                     [detect_x, detect_y] = detect[0][:2]
-                    print(detect_x,detect_y)
+                    # print(detect_x, detect_y)
                     distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
                     cost_matrix.append(distance)
                     # print(track_x, track_y, detect_x, detect_y, cost_matrix)
