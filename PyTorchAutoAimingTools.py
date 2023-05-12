@@ -104,24 +104,35 @@ def IMG_Tagging(im0, aims, color=False, text=False):
 class MultiDetection:
     def __init__(self):
         print("已使用目标跟踪器")
-        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed",[x,y,w,h],KM_predictor,unique_id,age]
+        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed", unique_id, age, [x,y,w,h], KM_predictor]
+        self.unique_id = 0
 
-    def Match(self, detections):
-        matches =
-        tracks = self.tracks
-
-    def new_track(self, new_track):
-        new_track.append(kalman.Position_Predict(new_track[0][4:6]))
-        self.tracks.append(new_track)
-
-    def del_track(self, id):
-        index = self.tracks.index(id)
-        self.tracks = self.tracks[:id].append(self.tracks[id + 1:])  # 删除一个目标行
-
-    def draw_tracks(self):
-        tracks = self.tracks
-        for track in tracks:
-            continue
+    def init_match(self, detections):  # 直接返回 tacked_list
+        # print(detections)
+        cost_matrix = []  # 初始化代价矩阵
+        if len(self.tracks) == 0:
+            for detect in detections:
+                self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman()])
+                self.unique_id += 1
+        elif len(self.tracks) > 1000:
+            self.tracks = []
+        else:
+            # 检测矩阵 跟踪任务矩阵
+            # 卡尔曼更新
+            # print(self.tracks)
+            for track in self.tracks:
+                print(track)
+                [track_x, track_y] = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
+                print(track_x, track_y)
+                for detect in detections:
+                    [detect_x, detect_y] = detect[0][:2]
+                    print(detect_x,detect_y)
+                    distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
+                    cost_matrix.append(distance)
+                    # print(track_x, track_y, detect_x, detect_y, cost_matrix)
+            cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))
+            print(cost_matrix)
+            # matches = linear_sum_assignment(cost_matrix)
 
 
 class YOLO:
