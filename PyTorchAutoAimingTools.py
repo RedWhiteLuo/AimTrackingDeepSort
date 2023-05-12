@@ -100,10 +100,12 @@ def IMG_Tagging(im0, aims, color=False, text=False):
         Picture.box_label(aim[0], label, color=colors(int(aim[2]), True))  # 坐标 标签 颜色（类别）
     return Picture.result()
 
+
 class MultiDetection:
     def __init__(self):
         print("已使用目标跟踪器")
-        self.tracks = [] #对每个人物进行保存 [ [八坐标/六坐标]，cls，conf，id, kalman]
+        self.tracks = []  # 对每个人物进行保存 [ [八坐标/六坐标]，cls，conf，id, kalman]
+
     def match_detections(self, cost_matrix):
         matches = linear_sum_assignment(cost_matrix)
         tracks = self.tracks
@@ -111,16 +113,15 @@ class MultiDetection:
     def new_track(self, new_track):
         new_track.append(kalman.Position_Predict(new_track[0][4:6]))
         self.tracks.append(new_track)
+
     def del_track(self, id):
         index = self.tracks.index(id)
-        self.tracks = self.tracks[:id].append(self.tracks[id+1:]) #删除一个目标行
+        self.tracks = self.tracks[:id].append(self.tracks[id + 1:])  # 删除一个目标行
+
     def draw_tracks(self):
         tracks = self.tracks
         for track in tracks:
             continue
-
-
-
 
 
 class YOLO:
