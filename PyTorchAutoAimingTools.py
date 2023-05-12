@@ -28,6 +28,35 @@ memdc.SelectObject(bmp)
 get_camera = GetCamera()  # 初始化相机类
 
 
+def xywh2xyxy(xywh):
+    x0, y0 = xywh[0] - xywh[2] / 2, xywh[1] - xywh[3] / 2
+    x1, y1 = xywh[0] + xywh[2] / 2, xywh[1] + xywh[3] / 2
+    return [x0, y0, x1, y1]
+
+
+def compute_IOU(rec1, rec2):
+    """
+    计算两个矩形框的交并比。
+    :param rec1: (x0,y0,x1,y1)      (x0,y0)代表矩形左上的顶点，（x1,y1）代表矩形右下的顶点。下同。
+    :param rec2: (x0,y0,x1,y1)
+    :return: 交并比IOU.
+    """
+    rec1 = xywh2xyxy(rec1)
+    rec2 = xywh2xyxy(rec2)
+    left_column_max = max(rec1[0], rec2[0])
+    right_column_min = min(rec1[2], rec2[2])
+    up_row_max = max(rec1[1], rec2[1])
+    down_row_min = min(rec1[3], rec2[3])
+    if left_column_max >= right_column_min or down_row_min <= up_row_max:
+        return 0
+    # 两矩形有相交区域的情况
+    else:
+        S1 = (rec1[2] - rec1[0]) * (rec1[3] - rec1[1])
+        S2 = (rec2[2] - rec2[0]) * (rec2[3] - rec2[1])
+        S_cross = (down_row_min - up_row_max) * (right_column_min - left_column_max)
+        return S_cross / (S1 + S2 - S_cross)
+
+
 def Get_img_source(x_y_w_h=None, other_source=None):
     """
     :param other_source: 默认是截屏，0为摄像头，可指定图片路径，如 './data/images/bus.jpg'
@@ -107,29 +136,32 @@ class MultiDetection:
         self.unique_id = 0
 
     def init_match(self, detections):  # 直接返回 tacked_list
-        # print(detections)
         cost_matrix = []  # 初始化代价矩阵
         if len(self.tracks) == 0:
             for detect in detections:
                 self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman()])
                 self.unique_id += 1
-        elif len(self.tracks) > 1000:
-            self.tracks = []
-        else:
-            # 检测矩阵 跟踪任务矩阵
-            # 卡尔曼更新
-            # print(self.tracks)
+        elif len(detections) > 0:
             for track in self.tracks:
-                # print(track)
                 track[3][:2] = track_x, track_y = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
                 for detect in detections:
                     [detect_x, detect_y] = detect[0][:2]
-                    # print(detect_x, detect_y)
                     distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
                     cost_matrix.append(distance)
-                    # print(track_x, track_y, detect_x, detect_y, cost_matrix)
-            cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))
-            person, job = linear_sum_assignment(cost_matrix)
+            cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))  # 这里用的是距离
+            _, job = linear_sum_assignment(cost_matrix)
+            for i in range(len(self.tracks)):  # 获得与之匹配的坐标
+                detect_xywh = detections[job[i]][0]  # 获得了坐标框
+                result = compute_IOU(self.tracks[i][3], detect_xywh)
+                if result > 0.5:
+                    self.tracks[i][3][:2] = detect_xywh[:2] # 更新坐标
+                    self.tracks[i][2] += 1 if self.tracks[i][2] < 100 else 100
+                elif self.tracks[i][2] < 0:     # 对没有匹配上的track age - 1
+                    self.tracks[i][2] -= 2
+                    print("已删除一个对象")
+        else:
+            for track in self.tracks:
+                track[2] -= 2       # 当没有目标的时候，所有的置信度都减少
 
 
 class YOLO:
