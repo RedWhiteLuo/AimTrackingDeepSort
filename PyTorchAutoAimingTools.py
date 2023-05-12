@@ -137,37 +137,3 @@ class YOLO:
         print("已激活网络")
 
 
-class YOLO:
-    def __init__(self, weights, datas, device='', dnn=False, half=False):
-        """
-        激活class YOLO 类中的网络
-        \n包含两个函数：
-        \n    前处理 PreProcess
-        \n    预测  Predict
-        """
-        device = select_device(device)
-        self.model = DetectMultiBackend(weights, device=device, dnn=dnn, data=datas, fp16=half)
-        print("已激活网络")
-
-    def PreProcess(self, resized_img):
-        """
-        输入缩放为 640 * 640  [w,h,c] 格式的图片
-        \n输出 torch 形式的数据
-        """
-        convert_img = np.asarray(resized_img)  # 转换为np.array形式[w,h,c]
-        convert_img = convert_img.swapaxes(0, 2)  # 交换为[c,h,w]
-        convert_img = convert_img.swapaxes(1, 2)  # 交换为[c,w,h]
-        convert_img = torch.from_numpy(convert_img).to(self.model.device)  # 转换为torch形式
-        convert_img = convert_img.half() if self.model.fp16 else convert_img.float()  # uint8 to fp16/32
-        convert_img /= 255  # 0 - 255 to 0.0 - 1.0
-        if len(convert_img.shape) == 3:
-            convert_img = convert_img[None]  # expand for batch dim
-        return convert_img
-
-    def Predict(self, convert_img, augment=False, visualize=False):  # 预测
-        """
-        输入 torch 格式的图片
-        \n输出网络的预测结果
-        """
-        predict = self.model(convert_img, augment=augment, visualize=visualize)
-        return predict
