@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+
 # 初始化卡尔曼滤波器
 kalman = cv2.KalmanFilter(4, 2)  # 四个输入，需要预测两个
 kalman.measurementMatrix = np.array([[1, 0, 0, 0],
@@ -13,11 +14,13 @@ kalman.processNoiseCov = np.array([[1, 0, 0, 0],
                                    [0, 0, 1, 0],
                                    [0, 0, 0, 1]], np.float32) * 0.01  # 噪声
 
+
 class Kalman:
     def __init__(self):
         self.last_measurement = None
         self.last_prediction = None
         print("原作者CSDN链接：https://blog.csdn.net/weixin_55737425/article/details/124560990")
+
     def Position_Predict(self, x, y):
         """
         :param x: 输入 x 坐标
@@ -40,8 +43,10 @@ class Kalman:
         self.last_prediction = prediction.copy()
         self.last_measurement = measurement
         return float(prediction[:2][0]), float(prediction[:2][1])
+
     def clean(self):
         self.last_measurement = None
+
 
 """
 作者链接，这个函数稍微修改了一下

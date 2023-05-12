@@ -104,10 +104,10 @@ def IMG_Tagging(im0, aims, color=False, text=False):
 class MultiDetection:
     def __init__(self):
         print("已使用目标跟踪器")
-        self.tracks = []  # 对每个人物进行保存 [ [八坐标/六坐标]，cls，conf，id, kalman]
+        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed",[x,y,w,h],KM_predictor,unique_id,age]
 
-    def match_detections(self, cost_matrix):
-        matches = linear_sum_assignment(cost_matrix)
+    def Match(self, detections):
+        matches =
         tracks = self.tracks
 
     def new_track(self, new_track):
