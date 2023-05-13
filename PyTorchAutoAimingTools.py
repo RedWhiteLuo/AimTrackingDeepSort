@@ -133,35 +133,54 @@ class MultiDetection:
     def __init__(self):
         print("已使用目标跟踪器")
         self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed", unique_id, age, [x,y,w,h], KM_predictor]
+        self.detections = []
         self.unique_id = 0
 
     def init_match(self, detections):  # 直接返回 tacked_list
         cost_matrix = []  # 初始化代价矩阵
-        if len(self.tracks) == 0:
+        mismatched_detections_index = [] # 由于 KM 算法缺陷，错误匹配的 detections
+        mismatched_tracks_index = []    # 由于 KM 算法缺陷，错误匹配的 tracks
+        if len(self.tracks) == 0:  # frame_0 初始化
             for detect in detections:
                 self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman()])
                 self.unique_id += 1
-        elif len(detections) > 0:
+                print(self.tracks)
+        elif len(self.tracks) != 0 and len(detections) > 0:  # 如果有目标，并且有存在的 track
+            '''这里使用 distance 作为代价矩阵，并计算出KM全局最优匹配的索引'''
             for track in self.tracks:
+                # print(track[4], type(track[4]), track, self.tracks)
                 track[3][:2] = track_x, track_y = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
                 for detect in detections:
                     [detect_x, detect_y] = detect[0][:2]
                     distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
                     cost_matrix.append(distance)
-            cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))  # 这里用的是距离
-            _, job = linear_sum_assignment(cost_matrix)
-            for i in range(len(self.tracks)):  # 获得与之匹配的坐标
-                detect_xywh = detections[job[i]][0]  # 获得了坐标框
-                result = compute_IOU(self.tracks[i][3], detect_xywh)
-                if result > 0.5:
-                    self.tracks[i][3][:2] = detect_xywh[:2] # 更新坐标
-                    self.tracks[i][2] += 1 if self.tracks[i][2] < 100 else 100
-                elif self.tracks[i][2] < 0:     # 对没有匹配上的track age - 1
-                    self.tracks[i][2] -= 2
-                    print("已删除一个对象")
+            cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))  # 这里用的是距离代价矩阵
+            matched_tracks_index, matched_detections_index = linear_sum_assignment(cost_matrix)
+            '''这里用来对数据进行清洗、更新'''
+            for i in range(min(len(self.tracks), len(detections))):  # 获得与 track 匹配的坐标 （要考虑 track 比 detections 多的情况）
+                print("debug: ", detections, self.tracks, i, matched_detections_index, matched_tracks_index)
+                detect_xywh = detections[matched_detections_index[i]][0]  # 获得detections的坐标框
+                result = compute_IOU(self.tracks[matched_tracks_index[i]][3], detect_xywh)  # 计算出 iou
+                # print(result)
+                # 这下面是对整个匹配完后的数据进行分类以及更新
+                '''由于 KM 算法一定会给出匹配，所以在下面要通过 iou 进行筛选'''
+                if result > 0.3:  # 如果 iou 大于阈值，那么就认为这个匹配是 matched_detections
+                    self.tracks[matched_tracks_index[i]][3][:2] = detect_xywh[:2]  # 更新坐标
+                    self.tracks[i][2] = 1 + self.tracks[i][2] if self.tracks[i][2] < 100 else 100   # 添加信任时间，设置上限
+                    self.tracks[matched_tracks_index[i]][0] = "confirmed" if self.tracks[i][2] > 10 else "unconfirmed"  # 更新状态
+                else:  # 这个 track-detection 的匹配是无效的，就认为是 unmatched_track
+                    mismatched_detections_index.append(matched_detections_index[i])  # 记录下错误匹配的 detections
+                    mismatched_tracks_index.append(matched_tracks_index[i])     # 记录下错误匹配的 tracks，
+
+            '''选择出没有匹配上的 detections, 并转换为 unconfirmed_track'''
+            '''for i in range(len(detections)):
+                if i not in matched_detections_index:
+                    self.tracks.append(["unconfirmed", self.unique_id, 0, detections[i][0], Kalman.Kalman()])
+                    self.unique_id += 1'''
         else:
             for track in self.tracks:
-                track[2] -= 2       # 当没有目标的时候，所有的置信度都减少
+                track[2] -= 2  # 当没有目标的时候，所有的置信度都减少
+                print(track[2])
 
 
 class YOLO:

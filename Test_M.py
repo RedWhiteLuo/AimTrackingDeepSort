@@ -6,7 +6,7 @@ import numpy as np
 from PyTorchAutoAimingTools import MultiDetection
 from PyTorchAutoAimingTools import YOLO
 from PyTorchAutoAimingTools import Get_img_source, PostProcess, IMG_Tagging
-from Kalman import Kalman
+import Kalman
 import keyboard
 
 weights = 'yolov5s.pt'
@@ -21,7 +21,7 @@ def one(queue1, queue2):
     """
     while True:
         T1 = time.perf_counter()
-        resized_img, img = Get_img_source()  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
+        resized_img, img = Get_img_source(other_source=0)  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
         queue1.put(resized_img)
         queue2.put(img)
         T2 = time.perf_counter()
@@ -63,8 +63,8 @@ def three(queue3, queue4, queue2, queue5, queue6, ):
         aim, aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
         MD.init_match(aims)
         tag = IMG_Tagging(img, aims)
-        # queue5.put(tag)
-        # queue6.put(aim)
+        queue5.put(tag)
+        queue6.put(aim)
         T2 = time.perf_counter()
         # print(1/ (T2-T1))
 
@@ -84,7 +84,7 @@ def show(queue5, queue6, ):
     d_position_list = np.array([[0, 0]])  # 声明变量
     img = queue5.get()  # 声明变量
     aim = [0, 0, 0, 0]  # 声明变量
-    KM = Kalman()  # 初始化类
+    KM = Kalman.Kalman()  # 初始化类
     Start_time = time.perf_counter()  # 声明变量
     T1 = T2 = time.perf_counter()  # 声明变量
     video = cv2.VideoWriter('./test.mp4', cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 60, (640, 480))
@@ -101,7 +101,7 @@ def show(queue5, queue6, ):
             [mx, my] = d_position_list.mean(0)  # 用移动速度列计算出平均值
             if d_position_list.shape[0] == 15:  # 使列表只存储5帧的数据
                 dx, dy = int(mx * aver_frame_rate * 0.1), int(my * aver_frame_rate * 0.1)  # 通过延迟计算出补偿量
-                if dx / d_position[0] < 0 and dy / d_position[1] < 0:   # 即：被检测的物体变向
+                if dx / d_position[0]+0.000001 < 0 and dy / d_position[1]+0.000001 < 0:   # 即：被检测的物体变向
                     d_position_list = np.array([[0, 0]])
                 else:
                     d_position_list = np.delete(d_position_list, 0, 0)
@@ -147,4 +147,4 @@ if __name__ == '__main__':
     One.start()
     Two.start()
     Three.start()
-    # Show.start()
+    Show.start()
