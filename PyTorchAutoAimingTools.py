@@ -133,11 +133,12 @@ def IMG_Tagging(im0, aims, color=False, text=False):
 class MultiDetection:
     def __init__(self):
         print("已使用目标跟踪器")
-        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed", unique_id, age, [x,y,w,h], KM_predictor]
+        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed", unique_id, age, [x,y,w,h], KM_predictor, if_miss]
         self.detections = []
         self.unique_id = 0
 
     def init_match(self, detections):  # 直接返回 tacked_list
+        result = []
         if len(self.tracks) == 0:  # frame_0 初始化
             for detect in detections:
                 self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman()])
@@ -148,16 +149,17 @@ class MultiDetection:
             offsets = 0
             for i in range(len(unmatched_tracks_index)):
                 # print("debug-23KS", self.tracks, i, i - offsets)
+                self.tracks[unmatched_tracks_index[i] - offsets][5] = True
                 if self.tracks[unmatched_tracks_index[i] - offsets][2] < 0:
                     print(f"已删除一个目标追踪器,id: {self.tracks[unmatched_tracks_index[i] - offsets][1]}")
                     self.tracks.pop(unmatched_tracks_index[i] - offsets)
                     offsets += 1
                 else:
                     self.tracks[unmatched_tracks_index[i] - offsets][2] -= 2
-            '''对没有匹配的 track 进行操作'''
+            '''对没有匹配的 detections 进行操作'''
             for i in range(len(unmatched_detections_index)):
-                self.tracks.append(
-                    ["unconfirmed", self.unique_id, 0, detections[unmatched_detections_index[i]][0], Kalman.Kalman()])
+                self.tracks.append(["unconfirmed", self.unique_id, 0,
+                                    detections[unmatched_detections_index[i]][0], Kalman.Kalman(), False])
                 print(f"已添加一个目标追踪器,id: {self.unique_id}")
                 self.unique_id += 1
         else:
@@ -169,6 +171,10 @@ class MultiDetection:
                     print(f"无检测目标，已删除一个目标追踪器,id: {self.tracks[i - offsets][1]}")
                     self.tracks.pop(i - offsets)
                     offsets += 1
+        for track in self.tracks:
+            x, y, w, h = track[3]
+            result.append([[x + w / 2, y + h / 2, x - w / 2, y - h / 2], float(1), int(track[1])])
+        return result
 
     def IoU_Match(self, detections):
         # print("debug-3J45", detections, self.tracks)
@@ -192,11 +198,12 @@ class MultiDetection:
             result = compute_IOU(track_xywh, detect_xywh)  # 计算出 iou
             # print("debug-390A", detect_xywh, track_xywh, result, i)
             if result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是 matched_detections
-                self.tracks[matched_tracks_index[i]][3][:2] = detect_xywh[:2].copy()  # 更新坐标
+                self.tracks[matched_tracks_index[i]][3] = detect_xywh.copy()  # 更新坐标
                 self.tracks[matched_tracks_index[i]][2] = 1 + self.tracks[i][2] if self.tracks[i][
                                                                                        2] < 100 else 100  # 添加信任时间，设置上限
                 self.tracks[matched_tracks_index[i]][0] = "confirmed" if self.tracks[i][
                                                                              2] > 10 else "unconfirmed"  # 更新状态
+                self.tracks[matched_tracks_index[i]][5] = False
             else:  # 这个 track-detection 的匹配是无效的，就认为是 unmatched_track
                 mismatched_detections_index.append(matched_detections_index[i])  # 记录下 错误 匹配的 detections
                 mismatched_tracks_index.append(matched_tracks_index[i])  # 记录下 错误 匹配的 detections

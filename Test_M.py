@@ -2,6 +2,7 @@ import time
 import cv2
 from multiprocessing import Process, Queue
 
+import copy
 import numpy as np
 from PyTorchAutoAimingTools import MultiDetection
 from PyTorchAutoAimingTools import YOLO
@@ -61,8 +62,11 @@ def three(queue3, queue4, queue2, queue5, queue6, ):
         T1 = time.perf_counter()
         img, predict, resize_img = queue2.get(), queue3.get(), queue4.get()
         aim, aims, all_aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
-        MD.init_match(all_aims)
-        tag = IMG_Tagging(img, aims)
+        result = MD.init_match(all_aims)
+        tag = IMG_Tagging(copy.deepcopy(img), aims)
+        tag_1 = IMG_Tagging(copy.deepcopy(img), result, color=10)
+        cv2.imshow("HEY ! THIS IS MT RESULT!", tag_1)
+        cv2.waitKey(1)  # 1 millisecond
         queue5.put(tag)
         queue6.put(aim)
         T2 = time.perf_counter()
@@ -101,7 +105,7 @@ def show(queue5, queue6, ):
             [mx, my] = d_position_list.mean(0)  # 用移动速度列计算出平均值
             if d_position_list.shape[0] == 15:  # 使列表只存储5帧的数据
                 dx, dy = int(mx * aver_frame_rate * 0.1), int(my * aver_frame_rate * 0.1)  # 通过延迟计算出补偿量
-                if dx / d_position[0]+0.000001 < 0 and dy / d_position[1]+0.000001 < 0:   # 即：被检测的物体变向
+                if dx / d_position[0] + 0.000001 < 0 and dy / d_position[1] + 0.000001 < 0:  # 即：被检测的物体变向
                     d_position_list = np.array([[0, 0]])
                 else:
                     d_position_list = np.delete(d_position_list, 0, 0)
