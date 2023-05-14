@@ -141,7 +141,7 @@ class MultiDetection:
         result = []
         if len(self.tracks) == 0:  # frame_0 初始化
             for detect in detections:
-                self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman()])
+                self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman(), False])
                 self.unique_id += 1
         elif len(self.tracks) != 0 and len(detections) > 0:  # 如果有目标，并且有存在的 track
             unmatched_detections_index, unmatched_tracks_index = self.IoU_Match(detections)  # 进行匹配
@@ -173,7 +173,8 @@ class MultiDetection:
                     offsets += 1
         for track in self.tracks:
             x, y, w, h = track[3]
-            result.append([[x + w / 2, y + h / 2, x - w / 2, y - h / 2], float(1), int(track[1])])
+            if track[5] is False:
+                result.append([[x + w / 2, y + h / 2, x - w / 2, y - h / 2], float(1), int(track[1])])
         return result
 
     def IoU_Match(self, detections):
@@ -183,7 +184,8 @@ class MultiDetection:
         '''使用距离作为代价矩阵，并给出索引'''
         for track in self.tracks:
             # print("debug-A23K", track[4], type(track[4]), track, self.tracks)
-            track_x, track_y = track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
+            track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1]) if track[5] is False else track[3][:2]
+            track_x, track_y = track[3][:2]
             for detect in detections:
                 [detect_x, detect_y] = detect[0][:2]
                 distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
@@ -199,7 +201,7 @@ class MultiDetection:
             # print("debug-390A", detect_xywh, track_xywh, result, i)
             if result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是 matched_detections
                 self.tracks[matched_tracks_index[i]][3] = detect_xywh.copy()  # 更新坐标
-                self.tracks[matched_tracks_index[i]][2] = 1 + self.tracks[i][2] if self.tracks[i][
+                self.tracks[matched_tracks_index[i]][2] = 2 + self.tracks[i][2] if self.tracks[i][
                                                                                        2] < 100 else 100  # 添加信任时间，设置上限
                 self.tracks[matched_tracks_index[i]][0] = "confirmed" if self.tracks[i][
                                                                              2] > 10 else "unconfirmed"  # 更新状态
