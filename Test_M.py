@@ -60,8 +60,8 @@ def three(queue3, queue4, queue2, queue5, queue6, ):
     while True:
         T1 = time.perf_counter()
         img, predict, resize_img = queue2.get(), queue3.get(), queue4.get()
-        aim, aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
-        MD.init_match(aims)
+        aim, aims, all_aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
+        MD.init_match(all_aims)
         tag = IMG_Tagging(img, aims)
         queue5.put(tag)
         queue6.put(aim)

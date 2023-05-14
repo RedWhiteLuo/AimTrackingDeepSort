@@ -4,7 +4,6 @@ import numpy as np
 
 class Kalman:
     def __init__(self):
-        print("已新建一个kalman追踪器")
         self.kalman = cv2.KalmanFilter(4, 2)  # 四个输入，需要预测两个
         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0],
                                                   [0, 1, 0, 0]], np.float32)

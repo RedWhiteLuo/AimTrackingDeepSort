@@ -98,7 +98,7 @@ def PostProcess(predict, resized_img, origin_img, conf_thres=0.3, iou_thres=0.45
     """
     det = non_max_suppression(predict, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]  # NMS 处理
     gn = torch.tensor(origin_img.shape)[[1, 0, 1, 0]]  # 归一化处理
-    aim, distance, all_aim = [[0, 0, 0, 0], 0, 0, 0], 409600, []  # [[xywh], conf, cls]
+    aim, distance, all_aim, all_aims = [[0, 0, 0, 0], 0, 0, 0], 409600, [], []  # [[xywh], conf, cls]
     if len(det):
         det[:, :4] = scale_boxes(resized_img.shape, det[:, :4], origin_img.shape).round()  # 将缩放后坐标映射回原坐标
         for *xyxy, conf, cls in reversed(det):
@@ -107,9 +107,10 @@ def PostProcess(predict, resized_img, origin_img, conf_thres=0.3, iou_thres=0.45
             single_distance = int((x - grab_w / 2) ** 2 + (y - grab_h / 2) ** 2)  # 计算距离
             if x > 10 and y > 10 and w > 10 and h > 10:  # 尚不清楚为什么会有左上角的目标@@
                 all_aim.append([[x + w / 2, y + h / 2, x - w / 2, y - h / 2], float(conf), int(cls)])  # 保存所有的目标
+                all_aims.append([[x, y, w, h], float(conf), int(cls)])  # 保存所有的目标
             if single_distance < distance:
                 aim, distance = [[x, y, w, h], float(conf), int(cls), single_distance], single_distance
-    return aim, all_aim
+    return aim, all_aim, all_aims
 
 
 def IMG_Tagging(im0, aims, color=False, text=False):
@@ -137,50 +138,79 @@ class MultiDetection:
         self.unique_id = 0
 
     def init_match(self, detections):  # 直接返回 tacked_list
-        cost_matrix = []  # 初始化代价矩阵
-        mismatched_detections_index = [] # 由于 KM 算法缺陷，错误匹配的 detections
-        mismatched_tracks_index = []    # 由于 KM 算法缺陷，错误匹配的 tracks
         if len(self.tracks) == 0:  # frame_0 初始化
             for detect in detections:
                 self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman()])
                 self.unique_id += 1
-                print(self.tracks)
         elif len(self.tracks) != 0 and len(detections) > 0:  # 如果有目标，并且有存在的 track
-            '''这里使用 distance 作为代价矩阵，并计算出KM全局最优匹配的索引'''
-            for track in self.tracks:
-                # print(track[4], type(track[4]), track, self.tracks)
-                track[3][:2] = track_x, track_y = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
-                for detect in detections:
-                    [detect_x, detect_y] = detect[0][:2]
-                    distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
-                    cost_matrix.append(distance)
-            cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))  # 这里用的是距离代价矩阵
-            matched_tracks_index, matched_detections_index = linear_sum_assignment(cost_matrix)
-            '''这里用来对数据进行清洗、更新'''
-            for i in range(min(len(self.tracks), len(detections))):  # 获得与 track 匹配的坐标 （要考虑 track 比 detections 多的情况）
-                print("debug: ", detections, self.tracks, i, matched_detections_index, matched_tracks_index)
-                detect_xywh = detections[matched_detections_index[i]][0]  # 获得detections的坐标框
-                result = compute_IOU(self.tracks[matched_tracks_index[i]][3], detect_xywh)  # 计算出 iou
-                # print(result)
-                # 这下面是对整个匹配完后的数据进行分类以及更新
-                '''由于 KM 算法一定会给出匹配，所以在下面要通过 iou 进行筛选'''
-                if result > 0.3:  # 如果 iou 大于阈值，那么就认为这个匹配是 matched_detections
-                    self.tracks[matched_tracks_index[i]][3][:2] = detect_xywh[:2]  # 更新坐标
-                    self.tracks[i][2] = 1 + self.tracks[i][2] if self.tracks[i][2] < 100 else 100   # 添加信任时间，设置上限
-                    self.tracks[matched_tracks_index[i]][0] = "confirmed" if self.tracks[i][2] > 10 else "unconfirmed"  # 更新状态
-                else:  # 这个 track-detection 的匹配是无效的，就认为是 unmatched_track
-                    mismatched_detections_index.append(matched_detections_index[i])  # 记录下错误匹配的 detections
-                    mismatched_tracks_index.append(matched_tracks_index[i])     # 记录下错误匹配的 tracks，
-
-            '''选择出没有匹配上的 detections, 并转换为 unconfirmed_track'''
-            '''for i in range(len(detections)):
-                if i not in matched_detections_index:
-                    self.tracks.append(["unconfirmed", self.unique_id, 0, detections[i][0], Kalman.Kalman()])
-                    self.unique_id += 1'''
+            unmatched_detections_index, unmatched_tracks_index = self.IoU_Match(detections)  # 进行匹配
+            '''把没有匹配上的 detections 初始化为 track'''
+            offsets = 0
+            for i in range(len(unmatched_tracks_index)):
+                # print("debug-23KS", self.tracks, i, i - offsets)
+                if self.tracks[unmatched_tracks_index[i] - offsets][2] < 0:
+                    print(f"已删除一个目标追踪器,id: {self.tracks[unmatched_tracks_index[i] - offsets][1]}")
+                    self.tracks.pop(unmatched_tracks_index[i] - offsets)
+                    offsets += 1
+                else:
+                    self.tracks[unmatched_tracks_index[i] - offsets][2] -= 2
+            '''对没有匹配的 track 进行操作'''
+            for i in range(len(unmatched_detections_index)):
+                self.tracks.append(
+                    ["unconfirmed", self.unique_id, 0, detections[unmatched_detections_index[i]][0], Kalman.Kalman()])
+                print(f"已添加一个目标追踪器,id: {self.unique_id}")
+                self.unique_id += 1
         else:
-            for track in self.tracks:
-                track[2] -= 2  # 当没有目标的时候，所有的置信度都减少
-                print(track[2])
+            offsets = 0
+            for i in range(len(self.tracks)):
+                self.tracks[i - offsets][2] -= 1  # 当没有目标的时候，所有的置信度都减少]
+                print(f"UMT id: {self.tracks[i - offsets][1]} age decreased, {self.tracks[i - offsets][2]}")
+                if self.tracks[i - offsets][2] < 0:
+                    print(f"无检测目标，已删除一个目标追踪器,id: {self.tracks[i - offsets][1]}")
+                    self.tracks.pop(i - offsets)
+                    offsets += 1
+
+    def IoU_Match(self, detections):
+        # print("debug-3J45", detections, self.tracks)
+        cost_matrix = []  # 初始化代价矩阵
+        mismatched_tracks_index, mismatched_detections_index = [], []  # 用来保存后面出现错误匹配的 detections - tracks
+        '''使用距离作为代价矩阵，并给出索引'''
+        for track in self.tracks:
+            # print("debug-A23K", track[4], type(track[4]), track, self.tracks)
+            track_x, track_y = track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1])  # kalman update
+            for detect in detections:
+                [detect_x, detect_y] = detect[0][:2]
+                distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
+                cost_matrix.append(distance)
+        cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(self.tracks), len(detections))  # 这里用的是距离代价矩阵
+        matched_tracks_index, matched_detections_index = linear_sum_assignment(cost_matrix)
+        '''这里用来对匹配的数据进行判断是否合理，并对必要的数据进行更新'''
+        for i in range(min(len(self.tracks), len(detections))):  # 获得与 track 匹配的坐标 （要考虑 track 比 detections 多的情况）
+            # print("debug-35JK: ", detections, self.tracks, i, matched_detections_index, matched_tracks_index)
+            detect_xywh = detections[matched_detections_index[i]][0]  # 获得detections的坐标框
+            track_xywh = self.tracks[matched_tracks_index[i]][3]
+            result = compute_IOU(track_xywh, detect_xywh)  # 计算出 iou
+            # print("debug-390A", detect_xywh, track_xywh, result, i)
+            if result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是 matched_detections
+                self.tracks[matched_tracks_index[i]][3][:2] = detect_xywh[:2].copy()  # 更新坐标
+                self.tracks[matched_tracks_index[i]][2] = 1 + self.tracks[i][2] if self.tracks[i][
+                                                                                       2] < 100 else 100  # 添加信任时间，设置上限
+                self.tracks[matched_tracks_index[i]][0] = "confirmed" if self.tracks[i][
+                                                                             2] > 10 else "unconfirmed"  # 更新状态
+            else:  # 这个 track-detection 的匹配是无效的，就认为是 unmatched_track
+                mismatched_detections_index.append(matched_detections_index[i])  # 记录下 错误 匹配的 detections
+                mismatched_tracks_index.append(matched_tracks_index[i])  # 记录下 错误 匹配的 detections
+        '''使用上面给出的索引更新数据，由于上面已经把错误匹配的索引添加上了，现在只需要添加没有匹配的索引'''
+        '''这下面的 mismatched_tracks_index = unmatched_tracks_index , 同理于 detections'''
+        # print("debug-42LN", len(self.tracks), len(detections), matched_tracks_index, mismatched_tracks_index)
+        for i in range(len(self.tracks)):
+            if i not in matched_tracks_index:
+                mismatched_tracks_index.append(i)
+        for i in range(len(detections)):
+            if i not in matched_detections_index:
+                mismatched_detections_index.append(i)
+        print(f"debug-2L13: NT(UMD):{mismatched_detections_index}, UMT:{mismatched_tracks_index}")
+        return mismatched_detections_index, mismatched_tracks_index
 
 
 class YOLO:
