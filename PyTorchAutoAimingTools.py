@@ -178,47 +178,42 @@ class MultiDetection:
                 result.append([[x + w / 2, y + h / 2, x - w / 2, y - h / 2], float(1), int(track[1])])
         return result
 
+    def Matching_Cascade(self, detections):
+        pass
+
     def IoU_Match(self, detections):
         # print("debug-3J45", detections, self.tracks)
         cost_matrix, unmatched_tracks = [], self.tracks  # 初始化代价矩阵
         mismatched_tracks_index, mismatched_detections_index = [], []  # 用来保存后面出现错误匹配的 detections - tracks
-        '''使用距离作为代价矩阵，并给出索引'''
+        '''使用距离作为代价矩阵，并给出 KM 全局最佳匹配的索引'''
         for track in unmatched_tracks:
             # print("debug-A23K", track[4], type(track[4]), track, self.tracks)
             track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1]) if track[5] is False else track[3][:2]
             track_x, track_y = track[3][:2]
             for detect in detections:
                 [detect_x, detect_y] = detect[0][:2]
-                distance = (track_x - detect_x) ** 2 + (track_y - detect_y) ** 2
-                cost_matrix.append(distance)
-        cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(unmatched_tracks), len(detections))  # 这里用的是距离代价矩阵
-        matched_tracks_index, matched_detections_index = linear_sum_assignment(cost_matrix)
+                cost_matrix.append((track_x - detect_x) ** 2 + (track_y - detect_y) ** 2)
+        cost_matrix = np.asarray(cost_matrix, dtype='int32').reshape(len(unmatched_tracks), len(detections))  # 距离代价矩阵
+        matched_tracks_index, matched_detections_index = linear_sum_assignment(cost_matrix)  # 进行 KM 匹配
         '''这里用来对匹配的数据进行判断是否合理，并对必要的数据进行更新'''
         for i in range(min(len(unmatched_tracks), len(detections))):  # 获得与 track 匹配的坐标 （要考虑 track 比 detections 多的情况）
             # print("debug-35JK: ", detections, self.tracks, i, matched_detections_index, matched_tracks_index)
-            detect_xywh = detections[matched_detections_index[i]][0]  # 获得detections的坐标框
-            track_xywh = unmatched_tracks[matched_tracks_index[i]][3]
-            result = compute_IOU(track_xywh, detect_xywh)  # 计算出 iou
+            detect = detections[matched_detections_index[i]]  # 获得 matched_detections
+            track = unmatched_tracks[matched_tracks_index[i]]  # 获得 matched_tracks
+            IoU_Result = compute_IOU(track[3], detect[0])  # 计算出 iou
             # print("debug-390A", detect_xywh, track_xywh, result, i)
-            if result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是 matched_detections
-                unmatched_tracks[matched_tracks_index[i]][3] = detect_xywh.copy()  # 更新坐标
-                unmatched_tracks[matched_tracks_index[i]][2] = 2 + unmatched_tracks[i][2] if unmatched_tracks[i][
-                                                                                       2] < 100 else 100  # 添加信任时间，设置上限
-                unmatched_tracks[matched_tracks_index[i]][0] = "confirmed" if unmatched_tracks[i][
-                                                                             2] > 10 else "unconfirmed"  # 更新状态
-                unmatched_tracks[matched_tracks_index[i]][5] = False
-            else:  # 这个 track-detection 的匹配是无效的，就认为是 unmatched_track
+            if IoU_Result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
+                track[3] = detect[0].copy()  # 更新坐标
+                track[2] = 2 + unmatched_tracks[i][2] if unmatched_tracks[i][2] < 100 else 100  # 添加信任时间，设置上限
+                track[0] = "confirmed" if unmatched_tracks[i][2] > 10 else "unconfirmed"  # 更新状态
+                track[5] = False    # 认为这个track没有消失（也就是被 yolo 给检测到了）
+            else:  # 这个 track-detection 的匹配是无效的
                 mismatched_detections_index.append(matched_detections_index[i])  # 记录下 错误 匹配的 detections
                 mismatched_tracks_index.append(matched_tracks_index[i])  # 记录下 错误 匹配的 detections
-        '''使用上面给出的索引更新数据，由于上面已经把错误匹配的索引添加上了，现在只需要添加没有匹配的索引'''
-        '''这下面的 mismatched_tracks_index = unmatched_tracks_index , 同理于 detections'''
+        '''使用上面给出的索引更新数据，由于上面已经把错误匹配的索引保存了，现在只需要添加没有匹配的 tracks, detections的索引'''
         # print("debug-42LN", len(self.tracks), len(detections), matched_tracks_index, mismatched_tracks_index)
-        for i in range(len(unmatched_tracks)):
-            if i not in matched_tracks_index:
-                mismatched_tracks_index.append(i)
-        for i in range(len(detections)):
-            if i not in matched_detections_index:
-                mismatched_detections_index.append(i)
+        [mismatched_tracks_index.append(i) for i in range(len(unmatched_tracks)) if i not in matched_tracks_index]
+        [mismatched_detections_index.append(i) for i in range(len(detections)) if i not in matched_detections_index]
         print(f"debug-2L13: NT(UMD):{mismatched_detections_index}, UMT:{mismatched_tracks_index}")
         return mismatched_detections_index, mismatched_tracks_index
 
