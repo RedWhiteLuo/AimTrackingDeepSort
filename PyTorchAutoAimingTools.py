@@ -166,6 +166,7 @@ class MultiDetection:
             offsets = 0
             for i in range(len(self.tracks)):
                 self.tracks[i - offsets][2] -= 1  # 当没有目标的时候，所有的置信度都减少]
+                self.tracks[i - offsets][5] = True  # 当没有目标的时候，全部都设置为丢失状态
                 print(f"UMT id: {self.tracks[i - offsets][1]} age decreased, {self.tracks[i - offsets][2]}")
                 if self.tracks[i - offsets][2] < 0:
                     print(f"无检测目标，已删除一个目标追踪器,id: {self.tracks[i - offsets][1]}")
