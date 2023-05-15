@@ -2,11 +2,14 @@ import time
 import cv2
 from multiprocessing import Process, Queue
 
+import copy
 import numpy as np
 
+from Tools_DeepSort import MultiDetection
+from Tools_Other import Get_img_source
 from Tools_YOLOV5 import YOLO
-from Tools_YOLOV5 import Get_img_source, PostProcess, IMG_Tagging
-from Kalman import Kalman
+from Tools_YOLOV5 import PostProcess, IMG_Tagging
+import Kalman
 import keyboard
 
 weights = 'yolov5s.pt'
@@ -21,7 +24,7 @@ def one(queue1, queue2):
     """
     while True:
         T1 = time.perf_counter()
-        resized_img, img = Get_img_source(other_source=0)  # 获取图片
+        resized_img, img = Get_img_source(other_source=0)  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
         queue1.put(resized_img)
         queue2.put(img)
         T2 = time.perf_counter()
@@ -56,11 +59,16 @@ def three(queue3, queue4, queue2, queue5, queue6, ):
     :param queue6: 放入经过后处理后得到的最近坐标
     :return: None
     """
+    MD = MultiDetection()
     while True:
         T1 = time.perf_counter()
         img, predict, resize_img = queue2.get(), queue3.get(), queue4.get()
-        aim, aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
-        tag = IMG_Tagging(img, aims)
+        aim, aims, all_aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
+        result = MD.init_match(all_aims)
+        tag = IMG_Tagging(copy.deepcopy(img), aims)
+        tag_1 = IMG_Tagging(copy.deepcopy(img), result, color=10)
+        cv2.imshow("HEY ! THIS IS MT RESULT!", tag_1)
+        cv2.waitKey(1)  # 1 millisecond
         queue5.put(tag)
         queue6.put(aim)
         T2 = time.perf_counter()
@@ -82,7 +90,7 @@ def show(queue5, queue6, ):
     d_position_list = np.array([[0, 0]])  # 声明变量
     img = queue5.get()  # 声明变量
     aim = [0, 0, 0, 0]  # 声明变量
-    KM = Kalman()  # 初始化类
+    KM = Kalman.Kalman()  # 初始化类
     Start_time = time.perf_counter()  # 声明变量
     T1 = T2 = time.perf_counter()  # 声明变量
     video = cv2.VideoWriter('./test.mp4', cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 60, (640, 480))
@@ -99,7 +107,7 @@ def show(queue5, queue6, ):
             [mx, my] = d_position_list.mean(0)  # 用移动速度列计算出平均值
             if d_position_list.shape[0] == 15:  # 使列表只存储5帧的数据
                 dx, dy = int(mx * aver_frame_rate * 0.1), int(my * aver_frame_rate * 0.1)  # 通过延迟计算出补偿量
-                if dx / d_position[0] < 0 and dy / d_position[1] < 0:   # 即：被检测的物体变向
+                if dx / d_position[0] + 0.000001 < 0 and dy / d_position[1] + 0.000001 < 0:  # 即：被检测的物体变向
                     d_position_list = np.array([[0, 0]])
                 else:
                     d_position_list = np.delete(d_position_list, 0, 0)
