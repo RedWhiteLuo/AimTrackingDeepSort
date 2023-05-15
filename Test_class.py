@@ -4,8 +4,8 @@ from multiprocessing import Process, Queue
 
 import numpy as np
 
-from PyTorchAutoAimingTools import YOLO
-from PyTorchAutoAimingTools import Get_img_source, PostProcess, IMG_Tagging
+from Tools_YOLOV5 import YOLO
+from Tools_YOLOV5 import Get_img_source, PostProcess, IMG_Tagging
 from Kalman import Kalman
 import keyboard
 

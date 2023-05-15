@@ -4,9 +4,11 @@ from multiprocessing import Process, Queue
 
 import copy
 import numpy as np
-from PyTorchAutoAimingTools import MultiDetection
-from PyTorchAutoAimingTools import YOLO
-from PyTorchAutoAimingTools import Get_img_source, PostProcess, IMG_Tagging
+
+from Tools_DeepSort import MultiDetection
+from Tools_Other import Get_img_source
+from Tools_YOLOV5 import YOLO
+from Tools_YOLOV5 import PostProcess, IMG_Tagging
 import Kalman
 import keyboard
 
