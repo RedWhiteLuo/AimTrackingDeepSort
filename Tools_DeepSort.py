@@ -61,9 +61,9 @@ class MultiDetection:
             detect = detections[KM_matched_detections_index[i]]  # 获得 matched_detections
             track = tracks[KM_matched_tracks_index[i]]  # 获得 matched_tracks
             IoU_Result = compute_IOU(track[3], detect[0])  # 计算出 iou
-            if IoU_Result > 0.3:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
+            if IoU_Result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
                 track[3] = detect[0].copy()  # 更新坐标
-                track[2] = 2 + track[2] if track[2] < 150 else 150  # 添加信任时间，设置上限
+                track[2] = 2 + track[2] if track[2] < 50 else 50  # 添加信任时间，设置上限
                 track[0] = "confirmed" if track[2] > 10 else "unconfirmed"  # 更新状态
                 track[5] = False  # 认为这个track没有消失（也就是被 yolo 给检测到了）
             else:  # 这个 track-detection 的匹配是无效的
@@ -88,6 +88,6 @@ class MultiDetection:
         ''' 对没有匹配上的 detections 进行操作'''
         for i in range(len(detections_index)):
             tracks.append(
-                ["unconfirmed", self.unique_id, 1, detections[detections_index[i]][0], Kalman.Kalman(), False])
+                ["unconfirmed", self.unique_id, 4, detections[detections_index[i]][0], Kalman.Kalman(), False])
             print(f"已添加一个目标追踪器,id: {self.unique_id}")
             self.unique_id += 1

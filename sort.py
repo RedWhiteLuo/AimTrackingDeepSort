@@ -4,8 +4,7 @@ from Tools_DeepSort import MultiDetection
 from Tools_Other import Get_img_source
 from Tools_YOLOV5 import YOLO
 from Tools_YOLOV5 import PostProcess, IMG_Tagging
-from time import sleep
-weights = 'yolov5s.pt'
+weights = 'yolov5s6.pt'
 data = 'data/coco128.yaml'
 MD = MultiDetection()
 Core = YOLO(weights, data)
