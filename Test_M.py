@@ -23,7 +23,8 @@ def one(queue1, queue2):
     """
     while True:
         T1 = time.perf_counter()
-        resized_img, img = Get_img_source(other_source="video")  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
+        resized_img, img = Get_img_source(
+            other_source="video")  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
         queue1.put(resized_img)
         queue2.put(img)
         T2 = time.perf_counter()

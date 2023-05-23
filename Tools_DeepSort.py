@@ -48,33 +48,30 @@ class MultiDetection:
         """
         tracks, detections, cost_matrix, = self.tracks, self.detections, []  # 声明变量
         unmatched_tracks_index, unmatched_detections_index = [], []  # 用来保存后面出现错误匹配的 detections - tracks 的索引
-        matched_tracks_index, matched_detections_index = [], []
         '''使用距离作为代价矩阵，并给出 KM 全局最佳匹配的索引'''
         for T_index in tracks_index:
             track = tracks[T_index]
-            track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1]) if track[5] is False else track[3][:2]
+            track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1])  # if track[5] is False else track[3][:2]
             [cost_matrix.append(1.0 - (compute_IOU(track[3], detections[D_index][0]))) for D_index in detections_index]
-        cost_matrix = np.asarray(cost_matrix, dtype='float16').reshape(len(detections_index), len(tracks_index))  # 代价矩阵
-        KM_matched_tracks_index, KM_matched_detections_index= linear_sum_assignment(cost_matrix)  # 进行 KM 匹配
+        cost_matrix = np.asarray(cost_matrix, dtype='float16').reshape(len(tracks_index), len(detections_index))  # 代价矩阵
+        KM_matched_tracks_index, KM_matched_detections_index = linear_sum_assignment(cost_matrix)  # 进行 KM 匹配
         # print("debug-J2K3: ", tracks_index, detections_index, KM_matched_tracks_index, KM_matched_detections_index)
-        [matched_tracks_index.append(tracks_index[i]) for i in KM_matched_tracks_index]
-        [matched_detections_index.append(detections_index[i]) for i in KM_matched_detections_index]
         '''对 KM 给出的全局最优进行判断是否合理'''
-        for i in range(min(len(matched_detections_index), len(matched_tracks_index))):
-            detect = detections[matched_detections_index[i]]  # 获得 matched_detections
-            track = tracks[matched_tracks_index[i]]  # 获得 matched_tracks
+        for i in range(min(len(KM_matched_tracks_index), len(KM_matched_detections_index))):
+            detect = detections[KM_matched_detections_index[i]]  # 获得 matched_detections
+            track = tracks[KM_matched_tracks_index[i]]  # 获得 matched_tracks
             IoU_Result = compute_IOU(track[3], detect[0])  # 计算出 iou
             if IoU_Result > 0.3:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
                 track[3] = detect[0].copy()  # 更新坐标
-                track[2] = 2 + track[2] if track[2] < 100 else 100  # 添加信任时间，设置上限
+                track[2] = 2 + track[2] if track[2] < 150 else 150  # 添加信任时间，设置上限
                 track[0] = "confirmed" if track[2] > 10 else "unconfirmed"  # 更新状态
                 track[5] = False  # 认为这个track没有消失（也就是被 yolo 给检测到了）
             else:  # 这个 track-detection 的匹配是无效的
-                unmatched_detections_index.append(matched_detections_index[i])  # 记录下 错误 匹配的 detections
-                unmatched_tracks_index.append(matched_tracks_index[i])  # 记录下 错误 匹配的 detections
+                unmatched_detections_index.append(KM_matched_detections_index[i])  # 记录下 错误 匹配的 detections
+                unmatched_tracks_index.append(KM_matched_tracks_index[i])  # 记录下 错误 匹配的 detections
         '''使用上面给出的索引更新数据，由于上面已经把错误匹配的索引保存了，现在只需要添加没有匹配的 tracks, detections的索引'''
-        [unmatched_tracks_index.append(i) for i in tracks_index if i not in matched_tracks_index]
-        [unmatched_detections_index.append(i) for i in detections_index if i not in matched_detections_index]
+        [unmatched_tracks_index.append(i) for i in tracks_index if i not in KM_matched_tracks_index]
+        [unmatched_detections_index.append(i) for i in detections_index if i not in KM_matched_detections_index]
         # print(f"debug-2L13: NT(UMD):{unmatched_detections_index}, UMT:{unmatched_tracks_index}")
         return unmatched_detections_index, unmatched_tracks_index
 
