@@ -4,7 +4,6 @@ from multiprocessing import Process, Queue
 
 import copy
 import numpy as np
-
 from Tools_DeepSort import MultiDetection
 from Tools_Other import Get_img_source
 from Tools_YOLOV5 import YOLO
@@ -24,7 +23,7 @@ def one(queue1, queue2):
     """
     while True:
         T1 = time.perf_counter()
-        resized_img, img = Get_img_source(other_source=0)  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
+        resized_img, img = Get_img_source(other_source="video")  # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg"
         queue1.put(resized_img)
         queue2.put(img)
         T2 = time.perf_counter()
@@ -64,7 +63,7 @@ def three(queue3, queue4, queue2, queue5, queue6, ):
         T1 = time.perf_counter()
         img, predict, resize_img = queue2.get(), queue3.get(), queue4.get()
         aim, aims, all_aims = PostProcess(predict, resize_img, img, max_det=50, classes=(0,))
-        result = MD.init_match(all_aims)
+        result = MD.init_match(copy.deepcopy(all_aims))
         tag = IMG_Tagging(copy.deepcopy(img), aims)
         tag_1 = IMG_Tagging(copy.deepcopy(img), result, color=10)
         cv2.imshow("HEY ! THIS IS MT RESULT!", tag_1)

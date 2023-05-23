@@ -7,9 +7,9 @@ from camera import GetCamera
 from utils.augmentations import letterbox
 from utils.general import (cv2)
 from utils.plots import Annotator, colors
-
+video = cv2.VideoCapture('./data/166959951-1-208.mp4')
 screen_w, screen_h = 1920, 1080  # 屏幕的分辨率
-grab_w, grab_h = 640, 480  # 获取框的长和宽
+grab_w, grab_h = 1920, 1080  # 获取框的长和宽
 centre_x, centre_y = screen_w / 2 + 640, screen_h / 2 + 160  # 准心中心
 
 hwin = win32gui.GetDesktopWindow()
@@ -68,6 +68,8 @@ def Get_img_source(x_y_w_h=None, other_source=None):
     elif other_source == 0:
         origin_img = get_camera.capture()
         origin_img = cv2.flip(origin_img, 180)
+    elif other_source == "video":
+        ret, origin_img = video.read()
     else:
         origin_img = cv2.imread(other_source)  # 用来直接读取图片
     resized_img, _1, _2 = letterbox(origin_img, auto=False)  # 缩放为 （640 640）大小
