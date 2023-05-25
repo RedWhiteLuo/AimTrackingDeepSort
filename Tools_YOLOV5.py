@@ -39,9 +39,8 @@ def PostProcess(predict, resized_img, origin_img, conf_thres=0.3, iou_thres=0.45
             corped_img = origin_img_copy[int(y - h / 2):int(y + h / 2), int(x - w / 2):int(x + w / 2), :]  # 保存图片
             corpe_h, corpe_w, _ = corped_img.shape
             corpe_w = (corpe_h/128) * corpe_w
-            corped_img, _, _ = letterbox(corped_img, new_shape=(128, corpe_w), auto=True)  # 缩放为 (128, 128)大小
-            cv2.imshow("HEY!", corped_img)
-            cv2.waitKey(1)  # 1 millisecond
+            corped_img, _, _ = letterbox(corped_img, new_shape=(128, corpe_w))  # 缩放为 (128, 128)大小
+            cv2.waitKey(1000)  # 1 millisecond
             all_aim.append([[x, y, w, h], float(conf), int(cls), corped_img])  # 保存所有的目标
     return all_aim
 

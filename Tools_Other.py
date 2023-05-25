@@ -7,7 +7,7 @@ from utils.augmentations import letterbox
 from utils.general import (cv2)
 from utils.plots import Annotator, colors
 
-video = cv2.VideoCapture('./data/csgo.mp4')
+video = cv2.VideoCapture('./data/166959951-1-208.mp4')
 screen_w, screen_h = 1920, 1080  # 屏幕的分辨率
 grab_w, grab_h = 640, 640  # 获取框的长和宽
 centre_x, centre_y = screen_w / 2 + 640, screen_h / 2 + 160  # 准心中心

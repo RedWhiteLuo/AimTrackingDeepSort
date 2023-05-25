@@ -13,7 +13,7 @@ Core = YOLO(weights, data)
 video = cv2.VideoWriter('./test.mp4', cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 25, (1920, 1080))
 
 while True:
-    resized_img, img, ret = Get_img_source(other_source=0)
+    resized_img, img, ret = Get_img_source(other_source="video")
     # 获取图片other_source="D:/0_AI_Learning/AI_DeepSort/zidane.jpg
     if ret is False:
         break
