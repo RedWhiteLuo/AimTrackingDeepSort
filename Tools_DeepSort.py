@@ -7,7 +7,7 @@ from Tools_Other import compute_IOU, xy_wh2xy_xy
 class MultiDetection:
     def __init__(self):
         print("已使用目标跟踪器")
-        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed", unique_id, age, [x,y,w,h], KM_predictor, if_miss]
+        self.tracks = []  # 这里保存到是track ["confirmed/unconfirmed", unique_id, age, [x,y,w,h], KM_predictor, if_miss, img]
         self.detections = []  # 这里保存到是track [[x,y,w,h], conf]
         self.unique_id = 0
 
@@ -17,11 +17,12 @@ class MultiDetection:
 
         if len(self.tracks) == 0:  # frame_0 初始化，无存在的 track
             for detect in input_detections:
-                self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman(), False])
+                self.tracks.append(["unconfirmed", self.unique_id, 0, detect[0], Kalman.Kalman(), False, detect[3]])
                 self.unique_id += 1
 
         elif len(self.tracks) != 0 and len(input_detections) > 0:  # 如果有目标，并且有存在的 track
             detections_index, tracks_index = list(range(len(self.detections))), list(range(len(self.tracks)))
+
             unmatched_detections_index, unmatched_tracks_index = self.IoU_Match(detections_index, tracks_index)  # 进行匹配
             self.Unmatched_Index_Perform(unmatched_detections_index, unmatched_tracks_index)
 
@@ -37,8 +38,40 @@ class MultiDetection:
         [result.append([xy_wh2xy_xy(track[3]), float(1), int(track[1])]) for track in self.tracks if track[5] is False]
         return result
 
-    def Matching_Cascade(self, detections):
-        pass
+    def Matching_Cascade(self, detections_index, tracks_index):
+        """
+                输入需要匹配的 detections and tracks 的索引\n
+                通过距离代价矩阵来进行匹配\n
+                返回没有匹配上的 detections and tracks 的索引\n
+                """
+        tracks, detections, cost_matrix, = self.tracks, self.detections, []  # 声明变量
+        unmatched_tracks_index, unmatched_detections_index = [], []  # 用来保存后面出现错误匹配的 detections - tracks 的索引
+        '''使用距离作为代价矩阵，并给出 KM 全局最佳匹配的索引'''
+        for T_index in tracks_index:
+            track = tracks[T_index]
+            track[3][:2] = track[4].Position_Predict(track[3][0], track[3][1])  # if track[5] is False else track[3][:2]
+            [cost_matrix.append(1.0 - (compute_IOU(track[3], detections[D_index][0]))) for D_index in detections_index]
+        cost_matrix = np.asarray(cost_matrix, dtype='float16').reshape(len(tracks_index), len(detections_index))  # 代价矩阵
+        KM_matched_tracks_index, KM_matched_detections_index = linear_sum_assignment(cost_matrix)  # 进行 KM 匹配
+        # print("debug-J2K3: ", tracks_index, detections_index, KM_matched_tracks_index, KM_matched_detections_index)
+        '''对 KM 给出的全局最优进行判断是否合理'''
+        for i in range(min(len(KM_matched_tracks_index), len(KM_matched_detections_index))):
+            detect = detections[KM_matched_detections_index[i]]  # 获得 matched_detections
+            track = tracks[KM_matched_tracks_index[i]]  # 获得 matched_tracks
+            IoU_Result = compute_IOU(track[3], detect[0])  # 计算出 iou
+            if IoU_Result > 0.1:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
+                track[3] = detect[0].copy()  # 更新坐标
+                track[2] = 2 + track[2] if track[2] < 50 else 50  # 添加信任时间，设置上限
+                track[0] = "confirmed" if track[2] > 10 else "unconfirmed"  # 更新状态
+                track[5] = False  # 认为这个track没有消失（也就是被 yolo 给检测到了）
+            else:  # 这个 track-detection 的匹配是无效的
+                unmatched_detections_index.append(KM_matched_detections_index[i])  # 记录下 错误 匹配的 detections
+                unmatched_tracks_index.append(KM_matched_tracks_index[i])  # 记录下 错误 匹配的 detections
+        '''使用上面给出的索引更新数据，由于上面已经把错误匹配的索引保存了，现在只需要添加没有匹配的 tracks, detections的索引'''
+        [unmatched_tracks_index.append(i) for i in tracks_index if i not in KM_matched_tracks_index]
+        [unmatched_detections_index.append(i) for i in detections_index if i not in KM_matched_detections_index]
+        # print(f"debug-2L13: NT(UMD):{unmatched_detections_index}, UMT:{unmatched_tracks_index}")
+        return unmatched_detections_index, unmatched_tracks_index
 
     def IoU_Match(self, detections_index, tracks_index):
         """
@@ -66,6 +99,7 @@ class MultiDetection:
                 track[2] = 2 + track[2] if track[2] < 50 else 50  # 添加信任时间，设置上限
                 track[0] = "confirmed" if track[2] > 10 else "unconfirmed"  # 更新状态
                 track[5] = False  # 认为这个track没有消失（也就是被 yolo 给检测到了）
+
             else:  # 这个 track-detection 的匹配是无效的
                 unmatched_detections_index.append(KM_matched_detections_index[i])  # 记录下 错误 匹配的 detections
                 unmatched_tracks_index.append(KM_matched_tracks_index[i])  # 记录下 错误 匹配的 detections

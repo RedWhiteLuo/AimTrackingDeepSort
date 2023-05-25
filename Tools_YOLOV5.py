@@ -1,7 +1,11 @@
+import copy
+
+import cv2
 import numpy as np
 import torch
 
 from models.common import DetectMultiBackend
+from utils.augmentations import letterbox
 from utils.general import (non_max_suppression, scale_boxes, xyxy2xywh)
 from utils.plots import Annotator, colors
 from utils.torch_utils import select_device
@@ -23,16 +27,22 @@ def PostProcess(predict, resized_img, origin_img, conf_thres=0.3, iou_thres=0.45
     [ [[x+w/2, y+h/2, x-w/2, y-h/2], float(conf), int(cls)] , ...]
     """
     img_h, img_w, _ = origin_img.shape  # 获取框的长和宽
+    origin_img_copy = copy.deepcopy(origin_img)
     det = non_max_suppression(predict, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]  # NMS 处理
     gn = torch.tensor(origin_img.shape)[[1, 0, 1, 0]]  # 归一化处理
-    all_aim = []  # [[xywh], conf, cls]
+    all_aim = []  # [[xywh], conf, cls,croped_img]
     if len(det):
         det[:, :4] = scale_boxes(resized_img.shape, det[:, :4], origin_img.shape).round()  # 将缩放后坐标映射回原坐标
         for *xyxy, conf, cls in reversed(det):
             x, y, w, h = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # 返回的是坐标框 中心 的xywh
             x, y, w, h = int(img_w * x), int(img_h * y), int(img_w * w), int(img_h * h)
-            single_distance = int((x - img_w / 2) ** 2 + (y - img_h / 2) ** 2)  # 计算距离
-            all_aim.append([[x, y, w, h], float(conf), int(cls)])  # 保存所有的目标
+            corped_img = origin_img_copy[int(y - h / 2):int(y + h / 2), int(x - w / 2):int(x + w / 2), :]  # 保存图片
+            corpe_h, corpe_w, _ = corped_img.shape
+            corpe_w = (corpe_h/128) * corpe_w
+            corped_img, _, _ = letterbox(corped_img, new_shape=(128, corpe_w), auto=True)  # 缩放为 (128, 128)大小
+            cv2.imshow("HEY!", corped_img)
+            cv2.waitKey(1)  # 1 millisecond
+            all_aim.append([[x, y, w, h], float(conf), int(cls), corped_img])  # 保存所有的目标
     return all_aim
 
 
@@ -70,7 +80,7 @@ class YOLO:
         输入缩放为 640 * 640  [w,h,c] 格式的图片
         \n输出 torch 形式的数据
         """
-        convert_img = np.asarray(resized_img)  # 转换为np.array形式[w,h,c]
+        convert_img = np.asarray(resized_img)  # 转换为np.array形式 [w,h,c]
         convert_img = convert_img.swapaxes(0, 2)  # 交换为[c,h,w]
         convert_img = convert_img.swapaxes(1, 2)  # 交换为[c,w,h]
         convert_img = torch.from_numpy(convert_img).to(self.model.device)  # 转换为torch形式
