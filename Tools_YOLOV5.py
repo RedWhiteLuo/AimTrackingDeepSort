@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+
 from models.common import DetectMultiBackend
 from utils.general import (non_max_suppression, scale_boxes, xyxy2xywh)
 from utils.plots import Annotator, colors
@@ -24,19 +25,15 @@ def PostProcess(predict, resized_img, origin_img, conf_thres=0.3, iou_thres=0.45
     img_h, img_w, _ = origin_img.shape  # 获取框的长和宽
     det = non_max_suppression(predict, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]  # NMS 处理
     gn = torch.tensor(origin_img.shape)[[1, 0, 1, 0]]  # 归一化处理
-    aim, distance, all_aim, all_aims = [[0, 0, 0, 0], 0, 0, 0], 409600, [], []  # [[xywh], conf, cls]
+    all_aim = []  # [[xywh], conf, cls]
     if len(det):
         det[:, :4] = scale_boxes(resized_img.shape, det[:, :4], origin_img.shape).round()  # 将缩放后坐标映射回原坐标
         for *xyxy, conf, cls in reversed(det):
             x, y, w, h = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # 返回的是坐标框 中心 的xywh
             x, y, w, h = int(img_w * x), int(img_h * y), int(img_w * w), int(img_h * h)
             single_distance = int((x - img_w / 2) ** 2 + (y - img_h / 2) ** 2)  # 计算距离
-            if x > 10 and y > 10 and w > 10 and h > 10:  # 尚不清楚为什么会有左上角的目标@@
-                all_aim.append([[x + w / 2, y + h / 2, x - w / 2, y - h / 2], float(conf), int(cls)])  # 保存所有的目标
-                all_aims.append([[x, y, w, h], float(conf), int(cls)])  # 保存所有的目标
-            if single_distance < distance:
-                aim, distance = [[x, y, w, h], float(conf), int(cls), single_distance], single_distance
-    return aim, all_aim, all_aims
+            all_aim.append([[x, y, w, h], float(conf), int(cls)])  # 保存所有的目标
+    return all_aim
 
 
 def IMG_Tagging(im0, aims, color=False, text=False):
