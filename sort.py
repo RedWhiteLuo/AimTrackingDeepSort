@@ -1,9 +1,9 @@
 import cv2
-import copy
+
 from Tools_DeepSort import MultiDetection
 from Tools_Other import Get_img_source
-from Tools_YOLOV5 import YOLO
 from Tools_YOLOV5 import PostProcess, IMG_Tagging
+from Tools_YOLOV5 import YOLO
 
 weights = 'yolov5s.pt'
 data = 'data/coco128.yaml'
@@ -24,6 +24,8 @@ while True:
     result = MD.init_match(all_aim)
     result_img = IMG_Tagging(img, result, color=10)
 
+    h, w, _ = result_img.shape
+    result_img = cv2.resize(result_img, (int(w / 2), int(h / 2)), interpolation=cv2.INTER_CUBIC)
     cv2.imshow("HEY ! THIS IS MT RESULT!", result_img)
     video.write(result_img)
     cv2.waitKey(1)  # 1 millisecond

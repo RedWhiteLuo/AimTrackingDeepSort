@@ -23,7 +23,7 @@ class MultiDetection:
         elif len(self.tracks) != 0 and len(input_detections) > 0:  # 如果有目标，并且有存在的 track
             detections_index, tracks_index = list(range(len(self.detections))), list(range(len(self.tracks)))
 
-            unmatched_detections_index, unmatched_tracks_index = self.Matching_Cascade(detections_index, tracks_index)  # 进行匹配
+            unmatched_detections_index, unmatched_tracks_index = self.IoU_Match(detections_index, tracks_index)  # 进行匹配
             self.Unmatched_Index_Perform(unmatched_detections_index, unmatched_tracks_index)
 
         else:
@@ -60,12 +60,11 @@ class MultiDetection:
         for i in range(min(len(KM_matched_tracks_index), len(KM_matched_detections_index))):
             detect = detections[KM_matched_detections_index[i]]  # 获得 matched_detections
             track = tracks[KM_matched_tracks_index[i]]  # 获得 matched_tracks
-            cost_result = cost_matrix[KM_matched_tracks_index[i]][KM_matched_detections_index[i]]  # 计算出 iou
-            if cost_result > 20:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
+            if True:  # 如果 iou 大于阈值，那么就认为这个匹配是正确的
                 track[3] = detect[0].copy()  # 更新坐标
                 track[2] = 2 + track[2] if track[2] < 50 else 50  # 添加信任时间，设置上限
                 track[0] = "confirmed" if track[2] > 10 else "unconfirmed"  # 更新状态
-                if len(detect[2]) < 100:
+                if len(track[6]) < 100:
                     track[6].append(detect[2])
                 else:
                     track[6] = track[6][2:]
